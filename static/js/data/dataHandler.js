@@ -1,12 +1,18 @@
 export let dataHandler = {
-    getBoards: async function () {
-        const response = await apiGet("/api/boards");
+    getPublicBoards: async function () {
+        const response = await apiGet("/api/boards/public");
+        return response;
+    },
+    getPrivateBoards: async function (userId) {
+        const response = await apiGet(`/api/boards/private?user=${userId}`);
         return response;
     },
     getBoard: async function (boardId) {
-        // the board is retrieved and then the callback function is called with the board
+        return await postData('/api/get_board', {id: boardId})
     },
-    getStatuses: async function () {
+    getStatuses: async function (boardId) {
+        let data = await postData('/api/getStatuses', {boardId: boardId});
+        return data
         // the statuses are retrieved and then the callback function is called with the statuses
     },
     getStatus: async function (statusId) {
@@ -19,9 +25,9 @@ export let dataHandler = {
     getCard: async function (cardId) {
         // the card is retrieved and then the callback function is called with the card
     },
-    createNewBoard: function (boardTitle) {
+    createNewBoard: function (boardTitle, userId=null) {
         // creates new board, saves it and calls the callback function with its data
-        return postData('/api/new_board', {title: boardTitle})
+        return postData('/api/new_board', {title: boardTitle, user_id: userId})
             .then(data => {
                 return data// JSON data parsed by `data.json()` call
             });
@@ -35,6 +41,16 @@ export let dataHandler = {
             });
     },
 
+    renameColumn: function (columnId, newStatus) {
+        let ColumnId = columnId[0];
+        let boardId = columnId[2];
+        // console.log(ColumnId, boardId);
+        return postData('/api/rename_column', {id:ColumnId, title:newStatus})
+            .then(data => {
+                return data
+            });
+    },
+
     createNewCard: async function (cardTitle, boardId, statusId) {
         // creates new card, saves it and calls the callback function with its data
     return postData('/api/new_card', {title: cardTitle, board_id: boardId, status: statusId})
@@ -42,6 +58,38 @@ export let dataHandler = {
                 return data// JSON data parsed by `data.json()` call
             });
     },
+
+    writeDefaultColumns: async function (boardId) {
+        return postData('/api/default_columns', {boardId:boardId})
+    },
+
+    writeNewStatus: async function (columnTitle, boardId) {
+        return postData('/api/column', {title: columnTitle, boardId: boardId})
+    },
+
+    deleteCard: async function (cardId) {
+        return apiDelete('/api/delete_card', {id: cardId})
+    },
+    renameCard: async function (cardId, newTitle) {
+        return postData('/api/rename_card', {id: cardId, title: newTitle})
+    },
+
+    deleteColumns: async function (columnId) {
+        return await apiDelete(`/api/delete_column/${columnId}`, {columnId:columnId});
+    },
+    archiveCard: async function (cardId) {
+        return apiDelete('/api/archive_card', {id:cardId})
+    },
+    getArchivedCards: async function (boardId) {
+        return postData('/api/archive_card', {id: boardId})
+    },
+    unarchiveCard: async function (cardId, status) {
+        return postData('/api/unarchive_card', {id: cardId, status: status})
+    },
+
+    deleteBoard: async function (boardId) {
+        return await apiDelete(`/api/delete_board/${boardId}`, {boardId:boardId});
+    }
 };
 
 
@@ -71,7 +119,16 @@ async function apiGet(url) {
 async function apiPost(url, payload) {
 }
 
-async function apiDelete(url) {
+async function apiDelete(url="", data={}) {
+        let response = await fetch(url, {
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json'
+            },
+            method: 'DELETE', // *GET, POST, PUT, DELETE, etc.
+            body: JSON.stringify(data) // body data type must match "Content-Type" header
+        });
+            return response.json();
 }
 
 async function apiPut(url) {

@@ -150,3 +150,9 @@ section.board{
 .hide {
     visibility: hidden;
 }
+
+.fas{
+    display: flex;
+    float:right;
+    left: 90%;
+}

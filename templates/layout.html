@@ -41,7 +41,6 @@
     <script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/jquery/1.5/jquery.min.js" defer></script>
     <script type="module" src="{{ url_for('static', filename='js/main.js') }}" defer></script>
 
-
 </head>
 <body>
 {% include 'navbar.html' %}
@@ -57,6 +56,7 @@
 {% endwith %}
 
 <div class="content">
+    <button id="reload" type="button" class='btn btn-outline-dark'>Refresh <img alt="refresh" src="static/refresh_white.png" width="10"></button>
     <h1>PROMAN</h1>
     <p>
 

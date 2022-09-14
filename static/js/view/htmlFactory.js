@@ -16,65 +16,64 @@ export function htmlFactory(template) {
             return cardBuilder
         default:
             console.error("Undefined template: " + template)
-            return () => { return "" }
+            return () => {
+                return ""
+            }
     }
 }
 
-export function inputBuilder(prevTitle){
-        let inp = document.createElement("input")
-        inp.setAttribute('class', 'rename')
-        inp.setAttribute('type', 'text')
+export function inputBuilder(type) {
+    let inp = document.createElement("input")
+    inp.setAttribute('class', 'rename')
+    inp.setAttribute('type', 'text')
 
-        let butt = document.createElement('button')
-        butt.setAttribute('class', 'rename-board')
+    let butt = document.createElement('button')
+        butt.setAttribute('class', `rename-${type}`)
         butt.setAttribute('type', 'submit')
         butt.textContent = 'Save'
-        let string =
-            `<input class="rename" type="text" placeholder="${prevTitle}">
-            <button class="rename-board" type="submit"> Save</button>`
+
+
     return [inp, butt]
 }
 
 
-function boardBuilder(board) {
+function boardBuilder(statuses, board) {
+    let columns = []
+    for (let col of statuses) {
+        columns.push(`<div class="board-column">
+                    <div class="board-column-title" data-status="${col.id}_${col.board_id}" data-column="${col.id}" data-board="${col.board_id}">${col.title}
+                        <button type="button" class="icon-button right fas fa-trash-alt" id="delete_column_${col.id}" style="float: right";></button>
+                    </div>
+
+                    <div class="board-column-content" data-status="${col.id}_${col.board_id}" data-board-id="${col.board_id}"></div>
+                </div>`)
+    }
     return `<div class="board-container">
                 <section class="board" data-board-id=${board.id}>
-                <div class="board-header"><span id='title' class="board-title" data-board-id=${board.id}>${board.title}</span>
-                    <button class="add-card">Add Card</button>
-                    <input type="image" src="../static/down.png" width="20" class="board-toggle" data-board-id="${board.id}" data-show="false"/>
-<!--                    <button class="toggle-board-button" data-board-id="${board.id}">Show Cards</button>-->
+                <div class="board-header"><span id='title' class="board-title" data-board-id=${board.id}>${board.title}<button type="button" class="icon-button right fas fa-trash-alt delete" data-board-id="${board.id}";></button></span></span> 
+                    <button type="button" class="board-toggle fas fa-folder" id="archived_cards_${board.id}" data-board-id="${board.id}" data-show="false" style="float: right"></button>       
+                    <input type="image" src="../static/down.png" width="20" class="arrow-board-toggle" data-board-id="${board.id}" data-show="false"/>
                 </div>
             <div class="board-content" data-board-id="${board.id}">
-                <div class="board-columns">
-                <div class="board-column">
-                    <div class="board-column-title">New</div>
-                    <div class="board-column-content" data-status="1_${board.id}"></div>
-                </div>
-                <div class="board-column">
-                    <div class="board-column-title">In progress</div>
-                    <div class="board-column-content" data-status="2_${board.id}"></div>
-                </div>
-                <div class="board-column">
-                    <div class="board-column-title">Testing</div>
-                    <div class="board-column-content" data-status="3_${board.id}"></div>
-                </div>
-                <div class="board-column">
-                    <div class="board-column-title">Done</div>
-                    <div class="board-column-content" data-status="4_${board.id}"></div>
-                </div>
-                
-                </div>
+                <div class="board-columns">` + columns.join('') +
+
+        `</div>
             </div>
                 </section>
             </div>`;
 }
 
 function cardBuilder(card) {
-    return `<div class="card" data-card-id="${card.id}" data-card-order="${card.card_order}" draggable="true">${card.title}</div>`;
+    return `<div class="card" style="position: relative;" data-card-id="${card.id}" data-card-order="${card.card_order}" draggable="true">${card.title}
+<button type="button" class="icon-button right fas fa-archive" id="archive_card_${card.id}" data-card-id="${card.id}"style="float: right"></button>
+<button type="button" class="icon-button right" style="float: right;"><i class="fas fa-trash-alt" style="float: right;"></i></button></div>`;
 }
 
 
 let dragged;
+let oldDraggedStatus;
+let oldCardOrder;
+let boardId;
 export const makeDroppable = {
     droppableBoards: function(){
         domManager.addEventListenerToMore(".board-column-content", 'dragover', makeDroppable.dragOver)
@@ -89,7 +88,9 @@ export const makeDroppable = {
     },
     dragStart: function(e){
         dragged = e.target; // ez azért kell, mert ez adja a felkapott card azonosítóját és ezt fogjuk SQL felé továbbadni (py-on keresztül), hogy átírjuk adatbázis részen is azt, hogy melyik oszlopban van
-
+        oldDraggedStatus = dragged.parentElement.parentElement.children[0].dataset.column
+        oldCardOrder = dragged.dataset.cardOrder
+        boardId = dragged.parentElement.parentElement.children[0].dataset.board
     },
     dragEnd: function(){
 
@@ -110,16 +111,18 @@ export const makeDroppable = {
         //e.currentTarget az, ahova visszük azt, amit megfogunk
         //.board-column-content -hez kell a targetet hozzátennünk
         // az oszlopokat megfoghatjuk ez alapján: data-status="1_${board.id}"
-        let newCardStatus = e.currentTarget.dataset.status[0] // ahová a kártyát letesszük, az az oszlop a táblázatban, aminek a számát átadjuk az SQLnek
+        let newCardStatus = e.currentTarget.parentElement.children[0].dataset.column// ahová a kártyát letesszük, az az oszlop a táblázatban, aminek a számát átadjuk az SQLnek
         let cardId = dragged.dataset.cardId
         cardsManager.changeCardStatus(cardId, newCardStatus)
-        if (!e.target.draggable) {
+        if (!e.target.draggable) { //ha üres oszlop
             e.currentTarget.appendChild(dragged);
-            //cardsManager.changeCardOrder(cardId, "1", newCardStatus)
+            cardsManager.changeCardOrder(cardId, "1")
+            cardsManager.changeCardsOrder(oldDraggedStatus, oldCardOrder, boardId, -1)
         }
-        else if (!e.target.nextSibling) {
+        else if (!e.target.nextSibling) { //ha utolsó
             e.currentTarget.appendChild(dragged);
-            cardsManager.changeCardOrder(cardId, "1", newCardStatus)
+            cardsManager.changeCardOrder(cardId, parseInt(e.target.dataset.cardOrder)+1)
+            cardsManager.changeCardsOrder(oldDraggedStatus, oldCardOrder, boardId, -1)
         }
         else {
             if (e.target !== dragged) {
@@ -134,12 +137,15 @@ export const makeDroppable = {
                 }
                 if (currentpos < droppedpos) {
                     e.target.parentNode.insertBefore(dragged, e.target.nextSibling);
+                    cardsManager.changeCardOrder(cardId, parseInt(e.target.dataset.cardOrder)+1)
+                    cardsManager.changeCardsOrder(newCardStatus, e.target.dataset.cardOrder, boardId, 1)
                 } else {
                     e.target.parentNode.insertBefore(dragged, e.target);
+                    cardsManager.changeCardOrder(cardId, e.target.dataset.cardOrder)
+                    cardsManager.changeCardsOrder(newCardStatus, e.target.dataset.cardOrder, boardId, 1)
                 }
-                cardsManager.changeCardOrder(cardId, (droppedpos+1).toString(), newCardStatus)
-                //cardsManager.changeCardOrder(cardId, (droppedpos+1).toString())
-                //cardsManager.changeCardOrder(e.target.dataset.cardId, (droppedpos+2).toString())
+                cardsManager.changeCardsOrder(oldDraggedStatus, oldCardOrder, boardId, -1)
+
             }
         }
     },
@@ -149,6 +155,10 @@ export const makeDroppable = {
 export function buttonBuilder() {
     return `<button type="button" class='btn btn-outline-dark' data-toggle='modal' data-target='#newBoard'
             id="create_new_board" name="new_board">Create new board</button>`
+}
+
+export function addButtonBuilder(type) {
+    return `<button type="button" style="margin-right:20px" class="add-${type}">Add ${type} </button>`
 }
 
 export function modalBuilder(type) {
@@ -176,4 +186,36 @@ export function modalBuilder(type) {
                 </div>
               </div>
             </div>`
+}
+
+export function newColumnBuilder(title, boardId, status) {
+    return `<div class="board-column">
+                    <div class="board-column-title">${title}
+                        <button type="button" class="icon-button right fas fa-trash-alt" id="delete_column_${status}" style="float: right"></button>     
+                    </div>    
+                    <div class="board-column-content" data-status="${status}_${boardId}"></div>
+                </div>`
+}
+
+export function archiveContainerBuilder(board, archived_cards) {
+    let cards = []
+    for (let card of archived_cards) {
+        cards.push(`<div class="card" style="position: relative;" data-card-id="${card.id}" draggable="true">${card.title}
+                        <button type="button" class="icon-button right fas fa-undo" id="unarchive_card" data-card-id="${card.id}" style="float: right"></button>
+                    </div>`)
+    }
+    return `<div class="archive board-container" data-board-id=${board.id}>
+                <section class="board" data-board-id=${board.id} >
+                <div class="board-header"><span id='title' class="board-title" data-board-id=${board.id}>Archived cards from ${board.title}</span> 
+                   </div>
+            <div class="archive-board-content" data-board-id="${board.id}">
+                <div class="board-columns">
+                <div class="board-column">
+                    <div class="board-column-title" ></div>
+                    <div class="board-column-content" data-board-id="${board.id}">` + cards.join('') +
+        `</div>            
+        </div>
+            </div>
+                </section>
+            </div>`;
 }
